@@ -1848,6 +1848,14 @@ func PrepareOpenAIResponsesBody(rawBody []byte) []byte {
 	normalizeResponsesStructuredOutputFormat(body)
 	normalizeResponsesFunctionTools(body)
 	normalizeResponsesToolChoice(body)
+	if tools, ok := body["tools"].([]any); ok {
+		for _, rawTool := range tools {
+			toolMap, ok := rawTool.(map[string]any)
+			if ok && isFunctionTool(toolMap) {
+				normalizeFunctionToolParameters(toolMap)
+			}
+		}
+	}
 	normalizeResponsesContentPartTypes(body)
 	normalizeResponsesInputMessageContent(body)
 	if shouldInjectOpenAIResponsesImageGenerationTool(body) {

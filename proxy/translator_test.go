@@ -687,6 +687,59 @@ func TestPrepareOpenAIResponsesBody_ImageGenerationToolChoiceInjectsTool(t *test
 	}
 }
 
+func TestPrepareOpenAIResponsesBody_NormalizesFunctionToolParameters(t *testing.T) {
+	raw := []byte(`{
+		"model":"gpt-4.1",
+		"input":"test",
+		"tools":[
+			{
+				"type":"function",
+				"name":"astrbot_execute_shell",
+				"parameters":{
+					"type":"object",
+					"required":null,
+					"properties":{
+						"command":{"type":"string"},
+						"args":{"type":"array"}
+					}
+				}
+			}
+		]
+	}`)
+
+	got := PrepareOpenAIResponsesBody(raw)
+
+	if required := gjson.GetBytes(got, "tools.0.parameters.required"); required.Exists() {
+		t.Fatalf("null required should be removed from OpenAI Responses tool schema, got %s; body=%s", required.Raw, got)
+	}
+	items := gjson.GetBytes(got, "tools.0.parameters.properties.args.items")
+	if !items.Exists() || items.Type != gjson.JSON {
+		t.Fatalf("expected array schema items object to be injected, got %s; body=%s", items.Raw, got)
+	}
+}
+
+func TestPrepareOpenAIResponsesBody_DefaultsMissingFunctionToolParameters(t *testing.T) {
+	raw := []byte(`{
+		"model":"gpt-4.1",
+		"input":"test",
+		"tools":[
+			{
+				"type":"function",
+				"name":"astr_kb_search"
+			}
+		]
+	}`)
+
+	got := PrepareOpenAIResponsesBody(raw)
+
+	if typ := gjson.GetBytes(got, "tools.0.parameters.type").String(); typ != "object" {
+		t.Fatalf("expected default OpenAI Responses function schema type object, got %q; body=%s", typ, got)
+	}
+	if props := gjson.GetBytes(got, "tools.0.parameters.properties"); !props.Exists() || props.Type != gjson.JSON {
+		t.Fatalf("expected default OpenAI Responses function schema properties object, got %s; body=%s", props.Raw, got)
+	}
+}
+
 func TestPrepareResponsesBody_SanitizesTextFormatJSONSchema(t *testing.T) {
 	raw := []byte(`{
 		"model":"gpt-5.4",

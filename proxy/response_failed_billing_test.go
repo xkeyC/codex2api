@@ -225,7 +225,7 @@ func TestResponsesWebSocketNonRetryableFailureReturnsErrorClose(t *testing.T) {
 	store := auth.NewStore(nil, nil, &database.SystemSettings{MaxConcurrency: 2, TestConcurrency: 1, TestModel: "gpt-5.4"})
 	store.AddAccount(&auth.Account{DBID: 1, AccessToken: "at-1", PlanType: "pro", AccountID: "acct-1"})
 	store.AddAccount(&auth.Account{DBID: 2, AccessToken: "at-2", PlanType: "pro", AccountID: "acct-2"})
-	handler := NewHandler(store, nil, &config.Config{AllowAnonymousV1: true}, nil)
+	handler := NewHandler(store, nil, &config.Config{AllowAnonymousV1: true, CodexUpstreamTransport: "ws"}, nil)
 
 	router := gin.New()
 	handler.RegisterRoutes(router)

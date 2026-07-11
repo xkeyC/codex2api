@@ -22,7 +22,7 @@ import (
 func newRetryTestHandler(t *testing.T) (*Handler, *auth.Store) {
 	t.Helper()
 	store := auth.NewStore(nil, nil, &database.SystemSettings{MaxConcurrency: 2, TestConcurrency: 1, TestModel: "gpt-5.4", MaxRetries: 2})
-	handler := NewHandler(store, nil, &config.Config{AllowAnonymousV1: true}, nil)
+	handler := NewHandler(store, nil, &config.Config{AllowAnonymousV1: true, CodexUpstreamTransport: "ws"}, nil)
 	return handler, store
 }
 

@@ -1064,58 +1064,59 @@ func TestSQLiteSystemSettingsPersistsFirstTokenTimeoutSeconds(t *testing.T) {
 
 	ctx := context.Background()
 	if err := db.UpdateSystemSettings(ctx, &SystemSettings{
-		SiteName:                         "CodexProxy",
-		MaxConcurrency:                   2,
-		GlobalRPM:                        0,
-		TestModel:                        "gpt-5.4",
-		TestContent:                      "say pong",
-		TestConcurrency:                  50,
-		BackgroundRefreshIntervalMinutes: 2,
-		UsageProbeMaxAgeMinutes:          10,
-		UsageProbeConcurrency:            16,
-		RecoveryProbeIntervalMinutes:     30,
-		PgMaxConns:                       50,
-		RedisPoolSize:                    30,
-		MaxRetries:                       2,
-		MaxRateLimitRetries:              1,
-		ModelMapping:                     "{}",
-		CodexModelMapping:                `{"gpt-5.2":"gpt-5.5"}`,
-		ReasoningEffortModels:            `[{"model":"gpt-5.5","effort":"xhigh"}]`,
-		DisabledImageGenerationModels:    `["gpt-5.4"]`,
-		PromptFilterMode:                 "monitor",
-		PromptFilterThreshold:            50,
-		PromptFilterStrictThreshold:      90,
-		PromptFilterLogMatches:           true,
-		PromptFilterMaxTextLength:        81920,
-		PromptFilterCustomPatterns:       "[]",
-		PromptFilterDisabledPatterns:     "[]",
-		PromptFilterReviewEnabled:        true,
-		PromptFilterReviewAPIKey:         "sk-review-test",
-		PromptFilterReviewBaseURL:        "https://review.example.com",
-		PromptFilterReviewModel:          "review-model",
-		PromptFilterReviewTimeoutSeconds: 7,
-		PromptFilterReviewFailClosed:     false,
-		ClientCompatMode:                 "preserve",
-		CodexMinCLIVersion:               "0.118.0",
-		CodexUserAgentConfig:             `{"terminal":"xterm-256color","os_name":"Linux","os_version":"Unknown"}`,
-		UsageLogMode:                     "full",
-		UsageLogBatchSize:                200,
-		UsageLogFlushIntervalSeconds:     5,
-		StreamFlushPolicy:                "immediate",
-		StreamFlushIntervalMS:            20,
-		FirstTokenMode:                   "loose",
-		FirstTokenTimeoutSeconds:         17,
-		BillingTierPolicy:                "requested",
-		ImageStorageConfig:               "{}",
-		SchedulerMode:                    "round_robin",
-		AffinityMode:                     "bounded",
-		BackgroundConfig:                 "{}",
-		ShowFullUsageNumbers:             true,
-		PublicKeyUsagePageEnabled:        true,
-		CodexWSHideUpstreamErrors:        true,
-		CodexWSSilentRetryEnabled:        true,
-		CodexWSSilentMaxRetries:          4,
-		IgnoreUsageLimitStatus:           true,
+		SiteName:                          "CodexProxy",
+		MaxConcurrency:                    2,
+		GlobalRPM:                         0,
+		TestModel:                         "gpt-5.4",
+		TestContent:                       "say pong",
+		TestConcurrency:                   50,
+		BackgroundRefreshIntervalMinutes:  2,
+		UsageProbeMaxAgeMinutes:           10,
+		UsageProbeConcurrency:             16,
+		RecoveryProbeIntervalMinutes:      30,
+		PgMaxConns:                        50,
+		RedisPoolSize:                     30,
+		MaxRetries:                        2,
+		MaxRateLimitRetries:               1,
+		ModelMapping:                      "{}",
+		CodexModelMapping:                 `{"gpt-5.2":"gpt-5.5"}`,
+		ReasoningEffortModels:             `[{"model":"gpt-5.5","effort":"xhigh"}]`,
+		DisabledImageGenerationModels:     `["gpt-5.4"]`,
+		PromptFilterMode:                  "monitor",
+		PromptFilterThreshold:             50,
+		PromptFilterStrictThreshold:       90,
+		PromptFilterLogMatches:            true,
+		PromptFilterMaxTextLength:         81920,
+		PromptFilterCustomPatterns:        "[]",
+		PromptFilterDisabledPatterns:      "[]",
+		PromptFilterReviewEnabled:         true,
+		PromptFilterReviewAPIKey:          "sk-review-test",
+		PromptFilterReviewBaseURL:         "https://review.example.com",
+		PromptFilterReviewModel:           "review-model",
+		PromptFilterReviewTimeoutSeconds:  7,
+		PromptFilterReviewFailClosed:      false,
+		ClientCompatMode:                  "preserve",
+		CodexMinCLIVersion:                "0.118.0",
+		CodexUserAgentConfig:              `{"terminal":"xterm-256color","os_name":"Linux","os_version":"Unknown"}`,
+		UsageLogMode:                      "full",
+		UsageLogBatchSize:                 200,
+		UsageLogFlushIntervalSeconds:      5,
+		StreamFlushPolicy:                 "immediate",
+		StreamFlushIntervalMS:             20,
+		FirstTokenMode:                    "loose",
+		FirstTokenTimeoutSeconds:          17,
+		BillingTierPolicy:                 "requested",
+		ImageStorageConfig:                "{}",
+		SchedulerMode:                     "round_robin",
+		AffinityMode:                      "bounded",
+		BackgroundConfig:                  "{}",
+		ShowFullUsageNumbers:              true,
+		PublicKeyUsagePageEnabled:         true,
+		CodexWSHideUpstreamErrors:         true,
+		CodexWSSilentRetryEnabled:         true,
+		CodexWSSilentMaxRetries:           4,
+		CodexWSAutoImageGenerationEnabled: true,
+		IgnoreUsageLimitStatus:            true,
 	}); err != nil {
 		t.Fatalf("UpdateSystemSettings 返回错误: %v", err)
 	}
@@ -1187,8 +1188,12 @@ func TestSQLiteSystemSettingsPersistsFirstTokenTimeoutSeconds(t *testing.T) {
 	if settings.CodexWSSilentMaxRetries != 4 {
 		t.Fatalf("CodexWSSilentMaxRetries = %d, want 4", settings.CodexWSSilentMaxRetries)
 	}
+	if !settings.CodexWSAutoImageGenerationEnabled {
+		t.Fatal("CodexWSAutoImageGenerationEnabled = false, want true")
+	}
 
 	settings.PublicKeyUsagePageEnabled = false
+	settings.CodexWSAutoImageGenerationEnabled = false
 	if err := db.UpdateSystemSettings(ctx, settings); err != nil {
 		t.Fatalf("UpdateSystemSettings false PublicKeyUsagePageEnabled 返回错误: %v", err)
 	}
@@ -1198,6 +1203,9 @@ func TestSQLiteSystemSettingsPersistsFirstTokenTimeoutSeconds(t *testing.T) {
 	}
 	if settings.PublicKeyUsagePageEnabled {
 		t.Fatal("PublicKeyUsagePageEnabled = true, want false")
+	}
+	if settings.CodexWSAutoImageGenerationEnabled {
+		t.Fatal("CodexWSAutoImageGenerationEnabled = true, want false")
 	}
 }
 

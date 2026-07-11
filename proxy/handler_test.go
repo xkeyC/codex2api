@@ -2751,16 +2751,23 @@ func TestSessionAffinityKeySeparatesDifferentAPIKeys(t *testing.T) {
 	}
 }
 
-// TestResponsesWebSocketStripsInjectedImageTool verifies that a plain
+// TestResponsesWebSocketStripsInjectedImageToolByDefault verifies that a plain
 // conversation request — which PrepareResponsesWebSocketBody auto-injects an
 // image_generation tool into — has that tool stripped before going to the
 // WebSocket upstream, so the model can't autonomously generate an image and
 // hang the WS stream (issue #220).
-func TestResponsesWebSocketStripsInjectedImageTool(t *testing.T) {
+func TestResponsesWebSocketStripsInjectedImageToolByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	previousExec := WebsocketExecuteFunc
-	t.Cleanup(func() { WebsocketExecuteFunc = previousExec })
+	previousSettings := CurrentRuntimeSettings()
+	t.Cleanup(func() {
+		WebsocketExecuteFunc = previousExec
+		ApplyRuntimeSettings(previousSettings)
+	})
+	nextSettings := previousSettings
+	nextSettings.CodexWSAutoImageGenerationEnabled = false
+	ApplyRuntimeSettings(nextSettings)
 
 	bodyCh := make(chan []byte, 1)
 	WebsocketExecuteFunc = func(ctx context.Context, account *auth.Account, requestBody []byte, sessionID string, proxyOverride string, apiKey string, deviceCfg *DeviceProfileConfig, headers http.Header, poolRouteKey string) (*http.Response, error) {
@@ -2798,6 +2805,65 @@ func TestResponsesWebSocketStripsInjectedImageTool(t *testing.T) {
 		// 整个请求体不应再出现 image_generation（工具与桥接 instructions 均已剥离）。
 		if strings.Contains(string(gotBody), "image_generation") {
 			t.Fatalf("websocket upstream body should not mention image_generation: %s", gotBody)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for upstream request")
+	}
+}
+
+// TestResponsesWebSocketPreservesInjectedImageToolWhenEnabled verifies that
+// codex_ws_auto_image_generation_enabled restores the WS auto image tool path.
+func TestResponsesWebSocketPreservesInjectedImageToolWhenEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	previousExec := WebsocketExecuteFunc
+	previousSettings := CurrentRuntimeSettings()
+	t.Cleanup(func() {
+		WebsocketExecuteFunc = previousExec
+		ApplyRuntimeSettings(previousSettings)
+	})
+	nextSettings := previousSettings
+	nextSettings.CodexWSAutoImageGenerationEnabled = true
+	ApplyRuntimeSettings(nextSettings)
+
+	bodyCh := make(chan []byte, 1)
+	WebsocketExecuteFunc = func(ctx context.Context, account *auth.Account, requestBody []byte, sessionID string, proxyOverride string, apiKey string, deviceCfg *DeviceProfileConfig, headers http.Header, poolRouteKey string) (*http.Response, error) {
+		bodyCh <- append([]byte(nil), requestBody...)
+		sse := `data: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2},"service_tier":"default"}}` + "\n\n"
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(sse)),
+		}, nil
+	}
+
+	store := auth.NewStore(nil, nil, &database.SystemSettings{MaxConcurrency: 2, TestConcurrency: 1, TestModel: "gpt-5.4"})
+	store.AddAccount(&auth.Account{DBID: 1, AccessToken: "at", PlanType: "plus", AccountID: "acct-1"})
+	handler := NewHandler(store, nil, &config.Config{AllowAnonymousV1: true, CodexUpstreamTransport: "ws"}, nil)
+
+	router := gin.New()
+	handler.RegisterRoutes(router)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/responses"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial websocket failed: %v", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"model":"gpt-5.4","input":"hello"}`)); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+
+	select {
+	case gotBody := <-bodyCh:
+		if !responsesBodyHasImageGenerationTool(gotBody) {
+			t.Fatalf("websocket upstream body should preserve image_generation tool: %s", gotBody)
+		}
+		if instructions := gjson.GetBytes(gotBody, "instructions").String(); !strings.Contains(instructions, codexImageGenerationBridgeMarker) {
+			t.Fatalf("websocket upstream body should preserve image bridge instructions: %s", gotBody)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for upstream request")

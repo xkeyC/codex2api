@@ -31,21 +31,22 @@ const (
 	RequestIsolationModeIsolated  = "isolated"
 	RequestIsolationModePerAPIKey = "per-api-key"
 
-	defaultClientCompatMode      = ClientCompatModePreserve
-	defaultCodexMinCLIVersion    = "0.118.0"
-	defaultStreamFlushPolicy     = StreamFlushPolicyImmediate
-	defaultStreamFlushIntervalMS = 20
-	minStreamFlushIntervalMS     = 1
-	maxStreamFlushIntervalMS     = 1000
-	defaultFirstTokenMode        = FirstTokenModeStrict
-	defaultFirstTokenTimeoutSec  = 0
-	maxFirstTokenTimeoutSec      = 600
-	defaultBillingTierPolicy     = BillingTierPolicyActual
-	defaultCodexWSHideErrors     = true
-	defaultCodexWSSilentRetry    = true
-	defaultCodexWSSilentRetries  = 2
-	maxCodexWSSilentRetries      = 10
-	defaultCodexMaxTools         = 128
+	defaultClientCompatMode                  = ClientCompatModePreserve
+	defaultCodexMinCLIVersion                = "0.118.0"
+	defaultStreamFlushPolicy                 = StreamFlushPolicyImmediate
+	defaultStreamFlushIntervalMS             = 20
+	minStreamFlushIntervalMS                 = 1
+	maxStreamFlushIntervalMS                 = 1000
+	defaultFirstTokenMode                    = FirstTokenModeStrict
+	defaultFirstTokenTimeoutSec              = 0
+	maxFirstTokenTimeoutSec                  = 600
+	defaultBillingTierPolicy                 = BillingTierPolicyActual
+	defaultCodexWSHideErrors                 = true
+	defaultCodexWSSilentRetry                = true
+	defaultCodexWSSilentRetries              = 2
+	maxCodexWSSilentRetries                  = 10
+	defaultCodexMaxTools                     = 128
+	defaultCodexWSAutoImageGenerationEnabled = false
 
 	defaultCodexContinueMaxRounds = 8
 	minCodexContinueMaxRounds     = 1
@@ -53,20 +54,21 @@ const (
 )
 
 type RuntimeSettings struct {
-	ClientCompatMode              string
-	CodexMinCLIVersion            string
-	CodexUserAgentConfig          string
-	DisabledImageGenerationModels string // JSON: ["gpt-5.4", ...]
-	StreamFlushPolicy             string
-	StreamFlushIntervalMS         int
-	FirstTokenMode                string
-	FirstTokenTimeoutSec          int
-	BillingTierPolicy             string
-	CodexForceWebsocket           bool // 强制 Codex 上游走 WebSocket（默认 false）
-	CodexWSHideErrors             bool // 隐藏 Codex WS 上游原始错误（默认 true）
-	CodexWSSilentRetry            bool // 首包前 Codex WS 上游错误静默换号重试（默认 true）
-	CodexWSSilentRetries          int  // Codex WS 静默换号最大重试次数（默认 2）
-	CodexMaxTools                 int  // Codex 上游允许的最大工具数量（默认 128）
+	ClientCompatMode                  string
+	CodexMinCLIVersion                string
+	CodexUserAgentConfig              string
+	DisabledImageGenerationModels     string // JSON: ["gpt-5.4", ...]
+	StreamFlushPolicy                 string
+	StreamFlushIntervalMS             int
+	FirstTokenMode                    string
+	FirstTokenTimeoutSec              int
+	BillingTierPolicy                 string
+	CodexForceWebsocket               bool // 强制 Codex 上游走 WebSocket（默认 false）
+	CodexWSHideErrors                 bool // 隐藏 Codex WS 上游原始错误（默认 true）
+	CodexWSSilentRetry                bool // 首包前 Codex WS 上游错误静默换号重试（默认 true）
+	CodexWSSilentRetries              int  // Codex WS 静默换号最大重试次数（默认 2）
+	CodexMaxTools                     int  // Codex 上游允许的最大工具数量（默认 128）
+	CodexWSAutoImageGenerationEnabled bool // WS 模式下是否保留自动注入的 image_generation（默认 false）
 	// CodexContinueThinking 检测到上游按 518n-2 指纹截断思考时自动续想并折叠成单响应（默认 false）。
 	CodexContinueThinking  bool
 	CodexContinueMaxRounds int // 单次请求最大续想轮数，含首轮（默认 8，范围 1-32）
@@ -95,23 +97,24 @@ func init() {
 
 func DefaultRuntimeSettings() RuntimeSettings {
 	return RuntimeSettings{
-		ClientCompatMode:                 defaultClientCompatMode,
-		CodexMinCLIVersion:               defaultCodexMinCLIVersion,
-		CodexUserAgentConfig:             DefaultCodexUserAgentConfigJSON(),
-		DisabledImageGenerationModels:    "[]",
-		StreamFlushPolicy:                defaultStreamFlushPolicy,
-		StreamFlushIntervalMS:            defaultStreamFlushIntervalMS,
-		FirstTokenMode:                   defaultFirstTokenMode,
-		FirstTokenTimeoutSec:             defaultFirstTokenTimeoutSec,
-		BillingTierPolicy:                defaultBillingTierPolicy,
-		CodexWSHideErrors:                defaultCodexWSHideErrors,
-		CodexWSSilentRetry:               defaultCodexWSSilentRetry,
-		CodexWSSilentRetries:             defaultCodexWSSilentRetries,
-		CodexMaxTools:                    defaultCodexMaxTools,
-		CodexContinueMaxRounds:           defaultCodexContinueMaxRounds,
-		RequestIsolationMode:             defaultRequestIsolationMode(),
-		CodexCLIVersionSyncEnabled:       true,
-		CodexCLIVersionSyncIntervalHours: 12,
+		ClientCompatMode:                  defaultClientCompatMode,
+		CodexMinCLIVersion:                defaultCodexMinCLIVersion,
+		CodexUserAgentConfig:              DefaultCodexUserAgentConfigJSON(),
+		DisabledImageGenerationModels:     "[]",
+		StreamFlushPolicy:                 defaultStreamFlushPolicy,
+		StreamFlushIntervalMS:             defaultStreamFlushIntervalMS,
+		FirstTokenMode:                    defaultFirstTokenMode,
+		FirstTokenTimeoutSec:              defaultFirstTokenTimeoutSec,
+		BillingTierPolicy:                 defaultBillingTierPolicy,
+		CodexWSHideErrors:                 defaultCodexWSHideErrors,
+		CodexWSSilentRetry:                defaultCodexWSSilentRetry,
+		CodexWSSilentRetries:              defaultCodexWSSilentRetries,
+		CodexMaxTools:                     defaultCodexMaxTools,
+		CodexWSAutoImageGenerationEnabled: defaultCodexWSAutoImageGenerationEnabled,
+		CodexContinueMaxRounds:            defaultCodexContinueMaxRounds,
+		RequestIsolationMode:              defaultRequestIsolationMode(),
+		CodexCLIVersionSyncEnabled:        true,
+		CodexCLIVersionSyncIntervalHours:  12,
 	}
 }
 
@@ -249,6 +252,7 @@ func ApplyRuntimeSettingsFromSystem(settings *database.SystemSettings) RuntimeSe
 		next.CodexWSSilentRetry = settings.CodexWSSilentRetryEnabled
 		next.CodexWSSilentRetries = settings.CodexWSSilentMaxRetries
 		next.CodexMaxTools = settings.CodexMaxTools
+		next.CodexWSAutoImageGenerationEnabled = settings.CodexWSAutoImageGenerationEnabled
 		next.CodexContinueThinking = settings.CodexContinueThinkingEnabled
 		next.CodexContinueMaxRounds = settings.CodexContinueMaxRounds
 		next.CodexSyncedCLIVersion = settings.CodexSyncedCLIVersion

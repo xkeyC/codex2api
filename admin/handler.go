@@ -5996,6 +5996,7 @@ type settingsResponse struct {
 	CodexWSHideUpstreamErrors          bool    `json:"codex_ws_hide_upstream_errors"`
 	CodexWSSilentRetryEnabled          bool    `json:"codex_ws_silent_retry_enabled"`
 	CodexWSSilentMaxRetries            int     `json:"codex_ws_silent_max_retries"`
+	CodexWSAutoImageGenerationEnabled  bool    `json:"codex_ws_auto_image_generation_enabled"`
 	CodexContinueThinkingEnabled       bool    `json:"codex_continue_thinking_enabled"`
 	CodexContinueMaxRounds             int     `json:"codex_continue_max_rounds"`
 	CodexCLIVersionSyncEnabled         bool    `json:"codex_cli_version_sync_enabled"`
@@ -6103,6 +6104,7 @@ type updateSettingsReq struct {
 	CodexWSHideUpstreamErrors          *bool    `json:"codex_ws_hide_upstream_errors"`
 	CodexWSSilentRetryEnabled          *bool    `json:"codex_ws_silent_retry_enabled"`
 	CodexWSSilentMaxRetries            *int     `json:"codex_ws_silent_max_retries"`
+	CodexWSAutoImageGenerationEnabled  *bool    `json:"codex_ws_auto_image_generation_enabled"`
 	CodexContinueThinkingEnabled       *bool    `json:"codex_continue_thinking_enabled"`
 	CodexContinueMaxRounds             *int     `json:"codex_continue_max_rounds"`
 	CodexCLIVersionSyncEnabled         *bool    `json:"codex_cli_version_sync_enabled"`
@@ -6702,6 +6704,7 @@ func (h *Handler) GetSettings(c *gin.Context) {
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),
 		CodexWSSilentRetryEnabled:          h.store.CodexWSSilentRetryEnabled(),
 		CodexWSSilentMaxRetries:            h.store.CodexWSSilentMaxRetries(),
+		CodexWSAutoImageGenerationEnabled:  h.store.CodexWSAutoImageGenerationEnabled(),
 		CodexContinueThinkingEnabled:       h.store.CodexContinueThinkingEnabled(),
 		CodexContinueMaxRounds:             h.store.CodexContinueMaxRounds(),
 		CodexCLIVersionSyncEnabled:         h.store.CodexCLIVersionSyncEnabled(),
@@ -7113,6 +7116,12 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		h.store.SetCodexWSSilentMaxRetries(v)
 		runtimeCfg.CodexWSSilentRetries = v
 		log.Printf("设置已更新: codex_ws_silent_max_retries = %d", v)
+	}
+
+	if req.CodexWSAutoImageGenerationEnabled != nil {
+		h.store.SetCodexWSAutoImageGenerationEnabled(*req.CodexWSAutoImageGenerationEnabled)
+		runtimeCfg.CodexWSAutoImageGenerationEnabled = *req.CodexWSAutoImageGenerationEnabled
+		log.Printf("设置已更新: codex_ws_auto_image_generation_enabled = %t", *req.CodexWSAutoImageGenerationEnabled)
 	}
 
 	if req.CodexContinueThinkingEnabled != nil {
@@ -7542,6 +7551,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),
 		CodexWSSilentRetryEnabled:          h.store.CodexWSSilentRetryEnabled(),
 		CodexWSSilentMaxRetries:            h.store.CodexWSSilentMaxRetries(),
+		CodexWSAutoImageGenerationEnabled:  h.store.CodexWSAutoImageGenerationEnabled(),
 		CodexContinueThinkingEnabled:       h.store.CodexContinueThinkingEnabled(),
 		CodexContinueMaxRounds:             h.store.CodexContinueMaxRounds(),
 		CodexCLIVersionSyncEnabled:         h.store.CodexCLIVersionSyncEnabled(),
@@ -7654,6 +7664,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),
 		CodexWSSilentRetryEnabled:          h.store.CodexWSSilentRetryEnabled(),
 		CodexWSSilentMaxRetries:            h.store.CodexWSSilentMaxRetries(),
+		CodexWSAutoImageGenerationEnabled:  h.store.CodexWSAutoImageGenerationEnabled(),
 		CodexContinueThinkingEnabled:       h.store.CodexContinueThinkingEnabled(),
 		CodexContinueMaxRounds:             h.store.CodexContinueMaxRounds(),
 		CodexCLIVersionSyncEnabled:         h.store.CodexCLIVersionSyncEnabled(),

@@ -1616,6 +1616,8 @@
     "codexWebsocketDesc": "控制代理与 Codex 上游之间的 WebSocket 长连接行为。全部默认关闭，不影响现有 HTTP 请求路径。",
     "codexForceWebsocket": "Codex 上游强制 WebSocket",
     "codexForceWebsocketDesc": "启用后，对 Codex 上游的请求将走 WebSocket 长连接（复用连接池），减少每次请求的 TLS/连接握手开销，更接近官方 CLI 体验。默认关闭，关闭时走原有 HTTP 请求。",
+    "codexWSAutoImageGeneration": "WS 自动生图工具",
+    "codexWSAutoImageGenerationDesc": "启用后，WebSocket 上游请求会保留服务端自动注入的 image_generation 工具。默认关闭：WS 路径剥离自动注入的生图工具；真实生图意图仍会回退 HTTP，非 WS 路径及客户端显式工具不受影响。",
     "codexMaxTools": "Codex 最大工具数",
     "codexMaxToolsDesc": "发送给 Codex 上游的工具数量上限，默认 128；超出时会截断，并优先保留生图与消息工具。",
     "disabledImageGenerationModels": "禁用生图注入模型",

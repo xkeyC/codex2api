@@ -1257,6 +1257,7 @@ export default function Settings() {
     codex_ws_hide_upstream_errors: true,
     codex_ws_silent_retry_enabled: true,
     codex_ws_silent_max_retries: 2,
+    codex_ws_auto_image_generation_enabled: false,
     codex_continue_thinking_enabled: false,
     codex_continue_max_rounds: 8,
     scheduler_mode: 'round_robin',
@@ -2346,6 +2347,12 @@ export default function Settings() {
                   <Switch
                     checked={settingsForm.codex_ws_silent_retry_enabled}
                     onCheckedChange={(checked) => autoSaveBooleanField('codex_ws_silent_retry_enabled', checked)}
+                  />
+                </SettingField>
+                <SettingField label={t('settings.codexWSAutoImageGeneration')} description={t('settings.codexWSAutoImageGenerationDesc')} layout="switch">
+                  <Switch
+                    checked={settingsForm.codex_ws_auto_image_generation_enabled}
+                    onCheckedChange={(checked) => autoSaveBooleanField('codex_ws_auto_image_generation_enabled', checked)}
                   />
                 </SettingField>
               </div>

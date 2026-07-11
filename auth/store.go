@@ -2263,12 +2263,13 @@ type Store struct {
 	fastSchedulerEnabled atomic.Bool
 
 	// Codex 上游 WebSocket 相关（默认全部关闭，不影响现有 HTTP 路径）
-	codexForceWebsocket         atomic.Bool  // 强制 Codex 上游走 WebSocket（复用连接池）
-	codexWSKeepaliveEnabled     atomic.Bool  // 启用上游 WS 空闲连接保活（仅 Ping）
-	codexWSKeepaliveIntervalSec atomic.Int64 // WS 保活 Ping 间隔（秒），默认 60
-	codexWSHideUpstreamErrors   atomic.Bool  // 隐藏上游 WS 原始错误，默认开启
-	codexWSSilentRetryEnabled   atomic.Bool  // 首包前上游 WS 错误静默换号重试，默认开启
-	codexWSSilentMaxRetries     atomic.Int64 // WS 静默换号最大重试次数，默认 2
+	codexForceWebsocket               atomic.Bool  // 强制 Codex 上游走 WebSocket（复用连接池）
+	codexWSKeepaliveEnabled           atomic.Bool  // 启用上游 WS 空闲连接保活（仅 Ping）
+	codexWSKeepaliveIntervalSec       atomic.Int64 // WS 保活 Ping 间隔（秒），默认 60
+	codexWSHideUpstreamErrors         atomic.Bool  // 隐藏上游 WS 原始错误，默认开启
+	codexWSSilentRetryEnabled         atomic.Bool  // 首包前上游 WS 错误静默换号重试，默认开启
+	codexWSSilentMaxRetries           atomic.Int64 // WS 静默换号最大重试次数，默认 2
+	codexWSAutoImageGenerationEnabled atomic.Bool  // WS 模式下是否保留自动注入的 image_generation
 
 	// Codex 思考截断自动续想（默认关闭，不影响现有路径）
 	codexContinueThinkingEnabled atomic.Bool  // 检测到上游截断思考时自动续想并折叠成单响应
@@ -2760,6 +2761,7 @@ func NewStore(db *database.DB, tc cache.TokenCache, settings *database.SystemSet
 	s.codexWSHideUpstreamErrors.Store(settings.CodexWSHideUpstreamErrors)
 	s.codexWSSilentRetryEnabled.Store(settings.CodexWSSilentRetryEnabled)
 	s.codexWSSilentMaxRetries.Store(normalizeWSSilentMaxRetries(settings.CodexWSSilentMaxRetries))
+	s.codexWSAutoImageGenerationEnabled.Store(settings.CodexWSAutoImageGenerationEnabled)
 	s.codexContinueThinkingEnabled.Store(settings.CodexContinueThinkingEnabled)
 	s.codexContinueMaxRounds.Store(int64(database.NormalizeCodexContinueMaxRounds(settings.CodexContinueMaxRounds)))
 	s.codexCLIVersionSyncEnabled.Store(settings.CodexCLIVersionSyncEnabled)
@@ -2995,6 +2997,22 @@ func (s *Store) CodexWSSilentMaxRetries() int {
 		return 2
 	}
 	return int(s.codexWSSilentMaxRetries.Load())
+}
+
+// SetCodexWSAutoImageGenerationEnabled 设置 WS 模式下是否保留自动注入的 image_generation。
+func (s *Store) SetCodexWSAutoImageGenerationEnabled(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.codexWSAutoImageGenerationEnabled.Store(enabled)
+}
+
+// CodexWSAutoImageGenerationEnabled 返回 WS 模式下是否保留自动注入的 image_generation。
+func (s *Store) CodexWSAutoImageGenerationEnabled() bool {
+	if s == nil {
+		return false
+	}
+	return s.codexWSAutoImageGenerationEnabled.Load()
 }
 
 // SetCodexContinueThinkingEnabled 设置是否在上游截断思考时自动续想。

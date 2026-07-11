@@ -285,9 +285,11 @@ func (h *Handler) forwardResponsesWebSocketTurn(c *gin.Context, conn *websocket.
 		if useWebsocket && rawResponsesBodyShouldForceHTTPForImageGeneration(rawBody) {
 			useWebsocket = false
 		}
-		// WebSocket 上游下剥离自动注入的图片工具，防止模型自主生图卡死。
+		// WebSocket 上游默认剥离自动注入的图片工具，防止模型自主生图卡死。
+		// codex_ws_auto_image_generation_enabled 开启时保留旧行为；真实生图意图
+		// 已在上方 rawResponsesBodyShouldForceHTTPForImageGeneration 分支改走 HTTP。
 		upstreamBody := codexBody
-		if useWebsocket {
+		if useWebsocket && !CurrentRuntimeSettings().CodexWSAutoImageGenerationEnabled {
 			upstreamBody = stripResponsesImageGenerationTool(codexBody)
 		}
 		// 在 useWebsocket 最终确定后再派生上游身份键：与 handler.go 的

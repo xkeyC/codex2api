@@ -1616,6 +1616,8 @@
     "codexWebsocketDesc": "Controls the persistent WebSocket connection between the proxy and the Codex upstream. All options are off by default and do not affect the existing HTTP request path.",
     "codexForceWebsocket": "Force Codex Upstream WebSocket",
     "codexForceWebsocketDesc": "When enabled, requests to the Codex upstream use a persistent WebSocket (with connection pooling), cutting per-request TLS/handshake overhead to better match the official CLI. Disabled by default; when off, requests use the existing HTTP path.",
+    "codexWSAutoImageGeneration": "WS Auto Image Tool",
+    "codexWSAutoImageGenerationDesc": "When enabled, WebSocket upstream requests keep the server auto-injected image_generation tool. Disabled by default: auto-injected image tools are stripped on WS, while real image-generation intent still falls back to HTTP and explicit image tools outside WS are unaffected.",
     "codexMaxTools": "Codex Max Tools",
     "codexMaxToolsDesc": "Maximum number of tools sent to the Codex upstream. Default 128; when exceeded, tools are truncated while preserving image and message tools first.",
     "disabledImageGenerationModels": "Disable Image Injection Models",

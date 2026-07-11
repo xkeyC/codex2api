@@ -632,6 +632,7 @@ export interface SystemSettings {
   model_mapping: string
   codex_model_mapping: string
   reasoning_effort_models: string
+  disabled_image_generation_models: string
   resin_url: string
   resin_platform_name: string
   prompt_filter_enabled: boolean

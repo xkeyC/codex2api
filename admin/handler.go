@@ -6016,6 +6016,7 @@ type settingsResponse struct {
 	ModelMapping                       string  `json:"model_mapping"`
 	CodexModelMapping                  string  `json:"codex_model_mapping"`
 	ReasoningEffortModels              string  `json:"reasoning_effort_models"`
+	DisabledImageGenerationModels      string  `json:"disabled_image_generation_models"`
 	ResinURL                           string  `json:"resin_url"`
 	ResinPlatformName                  string  `json:"resin_platform_name"`
 	PromptFilterEnabled                bool    `json:"prompt_filter_enabled"`
@@ -6116,6 +6117,7 @@ type updateSettingsReq struct {
 	ModelMapping                       *string  `json:"model_mapping"`
 	CodexModelMapping                  *string  `json:"codex_model_mapping"`
 	ReasoningEffortModels              *string  `json:"reasoning_effort_models"`
+	DisabledImageGenerationModels      *string  `json:"disabled_image_generation_models"`
 	ResinURL                           *string  `json:"resin_url"`
 	ResinPlatformName                  *string  `json:"resin_platform_name"`
 	PromptFilterEnabled                *bool    `json:"prompt_filter_enabled"`
@@ -6719,6 +6721,7 @@ func (h *Handler) GetSettings(c *gin.Context) {
 		ModelMapping:                       h.store.GetModelMapping(),
 		CodexModelMapping:                  h.store.GetCodexModelMapping(),
 		ReasoningEffortModels:              h.store.GetReasoningEffortModels(),
+		DisabledImageGenerationModels:      runtimeCfg.DisabledImageGenerationModels,
 		ResinURL:                           resinURL,
 		ResinPlatformName:                  resinPlatformName,
 		PromptFilterEnabled:                promptFilterCfg.Enabled,
@@ -7218,6 +7221,15 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		h.store.SetReasoningEffortModels(normalized)
 		log.Printf("设置已更新: reasoning_effort_models")
 	}
+	if req.DisabledImageGenerationModels != nil {
+		normalized, err := proxy.NormalizeModelListJSON(*req.DisabledImageGenerationModels, proxy.SupportedModelIDs(c.Request.Context(), h.db), "disabled_image_generation_models")
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		runtimeCfg.DisabledImageGenerationModels = normalized
+		log.Printf("设置已更新: disabled_image_generation_models")
+	}
 
 	if req.ClientCompatMode != nil {
 		runtimeCfg.ClientCompatMode = proxy.NormalizeClientCompatMode(*req.ClientCompatMode)
@@ -7545,6 +7557,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		ModelMapping:                       h.store.GetModelMapping(),
 		CodexModelMapping:                  h.store.GetCodexModelMapping(),
 		ReasoningEffortModels:              h.store.GetReasoningEffortModels(),
+		DisabledImageGenerationModels:      runtimeCfg.DisabledImageGenerationModels,
 		ResinURL:                           resinURL,
 		ResinPlatformName:                  resinPlatformName,
 		PromptFilterEnabled:                promptFilterCfg.Enabled,
@@ -7659,6 +7672,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		ModelMapping:                       h.store.GetModelMapping(),
 		CodexModelMapping:                  h.store.GetCodexModelMapping(),
 		ReasoningEffortModels:              h.store.GetReasoningEffortModels(),
+		DisabledImageGenerationModels:      runtimeCfg.DisabledImageGenerationModels,
 		ResinURL:                           resinURL,
 		ResinPlatformName:                  resinPlatformName,
 		PromptFilterEnabled:                promptFilterCfg.Enabled,

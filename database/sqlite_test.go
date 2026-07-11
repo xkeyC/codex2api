@@ -1081,6 +1081,7 @@ func TestSQLiteSystemSettingsPersistsFirstTokenTimeoutSeconds(t *testing.T) {
 		ModelMapping:                     "{}",
 		CodexModelMapping:                `{"gpt-5.2":"gpt-5.5"}`,
 		ReasoningEffortModels:            `[{"model":"gpt-5.5","effort":"xhigh"}]`,
+		DisabledImageGenerationModels:    `["gpt-5.4"]`,
 		PromptFilterMode:                 "monitor",
 		PromptFilterThreshold:            50,
 		PromptFilterStrictThreshold:      90,
@@ -1155,6 +1156,9 @@ func TestSQLiteSystemSettingsPersistsFirstTokenTimeoutSeconds(t *testing.T) {
 	}
 	if settings.ReasoningEffortModels != `[{"model":"gpt-5.5","effort":"xhigh"}]` {
 		t.Fatalf("ReasoningEffortModels = %q, want gpt-5.5 xhigh entry", settings.ReasoningEffortModels)
+	}
+	if settings.DisabledImageGenerationModels != `["gpt-5.4"]` {
+		t.Fatalf("DisabledImageGenerationModels = %q, want gpt-5.4 entry", settings.DisabledImageGenerationModels)
 	}
 	if !settings.PromptFilterReviewEnabled {
 		t.Fatal("PromptFilterReviewEnabled = false, want true")

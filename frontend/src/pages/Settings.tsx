@@ -86,6 +86,7 @@ type CodexUserAgentConfig = {
 }
 
 const EMPTY_REASONING_EFFORT_MODEL_ENTRIES: ReasoningEffortModelEntry[] = []
+const EMPTY_MODEL_LIST_ENTRIES: string[] = []
 const REASONING_EFFORT_OPTIONS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultra', 'max'].map((effort) => ({
   label: effort,
   value: effort,
@@ -182,6 +183,40 @@ const serializeReasoningEffortModelEntries = (entries: ReasoningEffortModelEntry
     normalized.push({ model, effort })
   }
   return JSON.stringify(normalized)
+}
+
+const parseModelListEntries = (value: string): string[] => {
+  try {
+    const parsed = JSON.parse(value || '[]')
+    if (!Array.isArray(parsed)) return EMPTY_MODEL_LIST_ENTRIES
+    const seen = new Set<string>()
+    const models: string[] = []
+    for (const item of parsed) {
+      const model = typeof item === 'string' ? item.trim() : ''
+      if (!model) continue
+      const key = model.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      models.push(model)
+    }
+    return models
+  } catch {
+    return EMPTY_MODEL_LIST_ENTRIES
+  }
+}
+
+const serializeModelListEntries = (entries: string[]) => {
+  const seen = new Set<string>()
+  const models: string[] = []
+  for (const item of entries) {
+    const model = item.trim()
+    if (!model) continue
+    const key = model.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    models.push(model)
+  }
+  return JSON.stringify(models)
 }
 
 const reasoningEffortAlias = (entry: ReasoningEffortModelEntry) => {
@@ -604,6 +639,86 @@ function ReasoningEffortModelsEditor({
       </div>
       <Button type="button" variant="outline" size="sm" className="self-start" onClick={handleAdd}>
         + {t('settings2.addReasoningModel')}
+      </Button>
+    </div>
+  )
+}
+
+function ModelListEditor({
+  value,
+  onChange,
+  modelOptions,
+}: {
+  value: string
+  onChange: (v: string) => void
+  modelOptions: Array<{ label: string; value: string }>
+}) {
+  const { t } = useTranslation()
+  const [entries, setEntries] = useState<string[]>(() => parseModelListEntries(value))
+  const lastEmittedValueRef = useRef<string | null>(null)
+  const selectOptions = useMemo(() => {
+    const byValue = new Map(modelOptions.map((option) => [option.value, option]))
+    for (const entry of entries) {
+      const model = entry.trim()
+      if (model && !byValue.has(model)) {
+        byValue.set(model, { label: model, value: model })
+      }
+    }
+    return [...byValue.values()]
+  }, [entries, modelOptions])
+
+  useEffect(() => {
+    if (value === lastEmittedValueRef.current) return
+    setEntries(parseModelListEntries(value))
+  }, [value])
+
+  const updateEntries = (nextEntries: string[]) => {
+    setEntries(nextEntries)
+    const serialized = serializeModelListEntries(nextEntries)
+    lastEmittedValueRef.current = serialized
+    onChange(serialized)
+  }
+
+  const handleChange = (index: number, model: string) => {
+    const next = [...entries]
+    next[index] = model
+    updateEntries(next)
+  }
+
+  const handleRemove = (index: number) => {
+    updateEntries(entries.filter((_, i) => i !== index))
+  }
+
+  const handleAdd = () => {
+    updateEntries([...entries, selectOptions[0]?.value ?? 'gpt-5.5'])
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="min-h-[180px] flex-1 space-y-1.5 overflow-y-auto pr-1">
+        {entries.map((model, i) => (
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-1.5">
+            <Select
+              compact
+              value={model.trim()}
+              options={selectOptions}
+              placeholder={t('settings2.selectModel')}
+              disabled={selectOptions.length === 0}
+              onValueChange={(next) => handleChange(i, next)}
+            />
+            <button
+              type="button"
+              onClick={() => handleRemove(i)}
+              aria-label={t('common.delete')}
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" className="self-start" onClick={handleAdd}>
+        + {t('settings2.addModel')}
       </Button>
     </div>
   )
@@ -1158,6 +1273,7 @@ export default function Settings() {
     model_mapping: '{}',
     codex_model_mapping: '{}',
     reasoning_effort_models: '[]',
+    disabled_image_generation_models: '[]',
     resin_url: '',
     resin_platform_name: '',
     prompt_filter_enabled: false,
@@ -3053,13 +3169,29 @@ export default function Settings() {
                 openLabel={t('settings.nav.manage')}
                 onOpen={() => setModelPanel('codex')}
               />
-              <ModelSummaryCard
-                title={t('settings2.reasoningEffortModels')}
-                description={t('settings2.reasoningEffortModelsDesc')}
-                meta={t('settings.nav.mappingCount', { count: reasoningEffortCount })}
-                openLabel={t('settings.nav.manage')}
-                onOpen={() => setModelPanel('reasoning')}
-              />
+              <div className="space-y-3">
+                <ModelSummaryCard
+                  title={t('settings2.reasoningEffortModels')}
+                  description={t('settings2.reasoningEffortModelsDesc')}
+                  meta={t('settings.nav.mappingCount', { count: reasoningEffortCount })}
+                  openLabel={t('settings.nav.manage')}
+                  onOpen={() => setModelPanel('reasoning')}
+                />
+                <SettingsCard
+                  title={t('settings2.disabledImageGenerationModels')}
+                  description={t('settings2.disabledImageGenerationModelsDesc')}
+                  contentClassName="flex h-full min-h-0 flex-col"
+                >
+                  <ModelListEditor
+                    value={settingsForm.disabled_image_generation_models}
+                    onChange={(v) => {
+                      setSettingsForm((f) => ({ ...f, disabled_image_generation_models: v }))
+                      void autoSaveSettingsPatch({ disabled_image_generation_models: v })
+                    }}
+                    modelOptions={codexModelOptions}
+                  />
+                </SettingsCard>
+              </div>
             </div>
 
             <Sheet open={modelPanel !== null} onOpenChange={(open) => { if (!open) setModelPanel(null) }}>

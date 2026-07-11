@@ -681,7 +681,8 @@ func hasStructuredResponsesFormat(body map[string]any) bool {
 // 带 hosted 图片工具的请求（issue #230）。
 func responsesModelRejectsHostedImageTool(body map[string]any) bool {
 	model := strings.TrimSpace(firstNonEmptyAnyString(body["model"]))
-	return strings.EqualFold(model, proOnlySparkModel)
+	return strings.EqualFold(model, proOnlySparkModel) ||
+		modelListJSONContains(CurrentRuntimeSettings().DisabledImageGenerationModels, model)
 }
 
 func shouldAutoInjectResponsesImageGenerationTool(body map[string]any) bool {
@@ -712,6 +713,9 @@ func shouldInjectOpenAIResponsesImageGenerationTool(body map[string]any) bool {
 	}
 	// 与 ChatGPT 路径一致:namespace 生图声明在场时不叠加注入。
 	if hasResponsesImageGenNamespaceTool(body) {
+		return false
+	}
+	if responsesModelRejectsHostedImageTool(body) {
 		return false
 	}
 	if hasResponsesImageGenerationToolChoice(body) {

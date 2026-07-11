@@ -1120,6 +1120,67 @@ func TestPrepareResponsesBody_SparkModelKeepsExplicitImageGenerationTool(t *test
 	}
 }
 
+func TestPrepareResponsesBody_DisabledImageGenerationModelSkipsAutoInjection(t *testing.T) {
+	previous := CurrentRuntimeSettings()
+	t.Cleanup(func() { ApplyRuntimeSettings(previous) })
+	settings := previous
+	settings.DisabledImageGenerationModels = `["gpt-5.4"]`
+	ApplyRuntimeSettings(settings)
+
+	raw := []byte(`{
+		"model":"gpt-5.4",
+		"input":"test"
+	}`)
+
+	got, _ := PrepareResponsesBody(raw)
+
+	if gjson.GetBytes(got, "tools").Exists() {
+		t.Fatalf("disabled model should not get default image_generation tool; body=%s", got)
+	}
+	if strings.Contains(gjson.GetBytes(got, "instructions").String(), codexImageGenerationBridgeMarker) {
+		t.Fatalf("disabled model should not get image bridge instructions; body=%s", got)
+	}
+}
+
+func TestPrepareResponsesBody_DisabledImageGenerationModelPreservesExplicitTool(t *testing.T) {
+	previous := CurrentRuntimeSettings()
+	t.Cleanup(func() { ApplyRuntimeSettings(previous) })
+	settings := previous
+	settings.DisabledImageGenerationModels = `["gpt-5.4"]`
+	ApplyRuntimeSettings(settings)
+
+	raw := []byte(`{
+		"model":"gpt-5.4",
+		"input":"draw a poster",
+		"tools":[{"type":"image_generation","model":"gpt-image-2"}]
+	}`)
+
+	got, _ := PrepareResponsesBody(raw)
+
+	if toolType := gjson.GetBytes(got, "tools.0.type").String(); toolType != "image_generation" {
+		t.Fatalf("explicit image_generation tool should be preserved; body=%s", got)
+	}
+	if instructions := gjson.GetBytes(got, "instructions").String(); !strings.Contains(instructions, codexImageGenerationBridgeMarker) {
+		t.Fatalf("explicit image_generation tool should still get bridge instructions; body=%s", got)
+	}
+}
+
+func TestPrepareResponsesBody_NonDisabledModelStillAutoInjectsImageGenerationTool(t *testing.T) {
+	previous := CurrentRuntimeSettings()
+	t.Cleanup(func() { ApplyRuntimeSettings(previous) })
+	settings := previous
+	settings.DisabledImageGenerationModels = `["gpt-5.4"]`
+	ApplyRuntimeSettings(settings)
+
+	raw := []byte(`{"model":"gpt-5.5","input":"hi"}`)
+
+	got, _ := PrepareResponsesBody(raw)
+
+	if toolType := gjson.GetBytes(got, "tools.0.type").String(); toolType != "image_generation" {
+		t.Fatalf("non-disabled model should get default image_generation tool, got %q; body=%s", toolType, got)
+	}
+}
+
 func TestPrepareResponsesBody_ImageGenNamespaceToolSkipsInjectionAndBridge(t *testing.T) {
 	raw := []byte(`{
 		"model":"gpt-5.5",

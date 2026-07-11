@@ -53,19 +53,20 @@ const (
 )
 
 type RuntimeSettings struct {
-	ClientCompatMode      string
-	CodexMinCLIVersion    string
-	CodexUserAgentConfig  string
-	StreamFlushPolicy     string
-	StreamFlushIntervalMS int
-	FirstTokenMode        string
-	FirstTokenTimeoutSec  int
-	BillingTierPolicy     string
-	CodexForceWebsocket   bool // 强制 Codex 上游走 WebSocket（默认 false）
-	CodexWSHideErrors     bool // 隐藏 Codex WS 上游原始错误（默认 true）
-	CodexWSSilentRetry    bool // 首包前 Codex WS 上游错误静默换号重试（默认 true）
-	CodexWSSilentRetries  int  // Codex WS 静默换号最大重试次数（默认 2）
-	CodexMaxTools         int  // Codex 上游允许的最大工具数量（默认 128）
+	ClientCompatMode              string
+	CodexMinCLIVersion            string
+	CodexUserAgentConfig          string
+	DisabledImageGenerationModels string // JSON: ["gpt-5.4", ...]
+	StreamFlushPolicy             string
+	StreamFlushIntervalMS         int
+	FirstTokenMode                string
+	FirstTokenTimeoutSec          int
+	BillingTierPolicy             string
+	CodexForceWebsocket           bool // 强制 Codex 上游走 WebSocket（默认 false）
+	CodexWSHideErrors             bool // 隐藏 Codex WS 上游原始错误（默认 true）
+	CodexWSSilentRetry            bool // 首包前 Codex WS 上游错误静默换号重试（默认 true）
+	CodexWSSilentRetries          int  // Codex WS 静默换号最大重试次数（默认 2）
+	CodexMaxTools                 int  // Codex 上游允许的最大工具数量（默认 128）
 	// CodexContinueThinking 检测到上游按 518n-2 指纹截断思考时自动续想并折叠成单响应（默认 false）。
 	CodexContinueThinking  bool
 	CodexContinueMaxRounds int // 单次请求最大续想轮数，含首轮（默认 8，范围 1-32）
@@ -97,6 +98,7 @@ func DefaultRuntimeSettings() RuntimeSettings {
 		ClientCompatMode:                 defaultClientCompatMode,
 		CodexMinCLIVersion:               defaultCodexMinCLIVersion,
 		CodexUserAgentConfig:             DefaultCodexUserAgentConfigJSON(),
+		DisabledImageGenerationModels:    "[]",
 		StreamFlushPolicy:                defaultStreamFlushPolicy,
 		StreamFlushIntervalMS:            defaultStreamFlushIntervalMS,
 		FirstTokenMode:                   defaultFirstTokenMode,
@@ -193,6 +195,13 @@ func NormalizeRuntimeSettings(settings RuntimeSettings) RuntimeSettings {
 	} else {
 		settings.CodexUserAgentConfig = defaults.CodexUserAgentConfig
 	}
+	if strings.TrimSpace(settings.DisabledImageGenerationModels) == "" {
+		settings.DisabledImageGenerationModels = defaults.DisabledImageGenerationModels
+	} else if normalized, err := NormalizeModelListJSON(settings.DisabledImageGenerationModels, nil, "disabled_image_generation_models"); err == nil {
+		settings.DisabledImageGenerationModels = normalized
+	} else {
+		settings.DisabledImageGenerationModels = defaults.DisabledImageGenerationModels
+	}
 	if settings.StreamFlushIntervalMS < minStreamFlushIntervalMS {
 		settings.StreamFlushIntervalMS = defaults.StreamFlushIntervalMS
 	}
@@ -229,6 +238,7 @@ func ApplyRuntimeSettingsFromSystem(settings *database.SystemSettings) RuntimeSe
 		next.ClientCompatMode = settings.ClientCompatMode
 		next.CodexMinCLIVersion = settings.CodexMinCLIVersion
 		next.CodexUserAgentConfig = settings.CodexUserAgentConfig
+		next.DisabledImageGenerationModels = settings.DisabledImageGenerationModels
 		next.StreamFlushPolicy = settings.StreamFlushPolicy
 		next.StreamFlushIntervalMS = settings.StreamFlushIntervalMS
 		next.FirstTokenMode = settings.FirstTokenMode

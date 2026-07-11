@@ -811,6 +811,7 @@ func (db *DB) migrate(ctx context.Context) error {
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS image_storage_config TEXT DEFAULT '{}';
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS show_full_usage_numbers BOOLEAN DEFAULT FALSE;
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS public_key_usage_page_enabled BOOLEAN DEFAULT TRUE;
+	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS disabled_image_generation_models TEXT DEFAULT '[]';
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS codex_force_websocket BOOLEAN DEFAULT FALSE;
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS codex_max_tools INT DEFAULT 128;
 	ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS codex_ws_keepalive_enabled BOOLEAN DEFAULT FALSE;
@@ -1443,15 +1444,16 @@ type SystemSettings struct {
 	ImageStorageConfig                 string // JSON: {"backend":"s3","endpoint":"...","region":"...","bucket":"...","access_key":"...","secret_key":"...","prefix":"...","force_path_style":false}
 	ShowFullUsageNumbers               bool
 	PublicKeyUsagePageEnabled          bool
-	CodexForceWebsocket                bool // 强制 Codex 上游走 WebSocket（复用连接池），默认 false
-	CodexMaxTools                      int  // Codex 上游允许的最大工具数量，默认 128
-	CodexWSKeepaliveEnabled            bool // 启用上游 WS 空闲连接保活（仅 Ping，不发业务帧），默认 false
-	CodexWSKeepaliveIntervalSec        int  // WS 保活 Ping 间隔（秒），默认 60
-	CodexWSHideUpstreamErrors          bool // 隐藏上游 WS 原始错误，默认 true
-	CodexWSSilentRetryEnabled          bool // 首包前 WS 上游错误静默换号重试，默认 true
-	CodexWSSilentMaxRetries            int  // WS 静默换号最大重试次数，默认 2
-	CodexContinueThinkingEnabled       bool // 检测到上游截断思考时自动续想并折叠成单响应，默认 false
-	CodexContinueMaxRounds             int  // 单次请求最大续想轮数（含首轮），默认 8
+	DisabledImageGenerationModels      string // JSON: ["gpt-5.5", ...]
+	CodexForceWebsocket                bool   // 强制 Codex 上游走 WebSocket（复用连接池），默认 false
+	CodexMaxTools                      int    // Codex 上游允许的最大工具数量，默认 128
+	CodexWSKeepaliveEnabled            bool   // 启用上游 WS 空闲连接保活（仅 Ping，不发业务帧），默认 false
+	CodexWSKeepaliveIntervalSec        int    // WS 保活 Ping 间隔（秒），默认 60
+	CodexWSHideUpstreamErrors          bool   // 隐藏上游 WS 原始错误，默认 true
+	CodexWSSilentRetryEnabled          bool   // 首包前 WS 上游错误静默换号重试，默认 true
+	CodexWSSilentMaxRetries            int    // WS 静默换号最大重试次数，默认 2
+	CodexContinueThinkingEnabled       bool   // 检测到上游截断思考时自动续想并折叠成单响应，默认 false
+	CodexContinueMaxRounds             int    // 单次请求最大续想轮数（含首轮），默认 8
 	AutoPause5hThreshold               float64
 	AutoPause7dThreshold               float64
 	AutoPause5hGuardBandPercent        float64
@@ -1585,6 +1587,7 @@ func (db *DB) GetSystemSettings(ctx context.Context) (*SystemSettings, error) {
 		       COALESCE(show_full_usage_numbers, false),
 		       COALESCE(public_key_usage_page_enabled, true),
 			       COALESCE(reasoning_effort_models, '[]'),
+			       COALESCE(disabled_image_generation_models, '[]'),
 			       COALESCE(codex_force_websocket, false),
 			       COALESCE(codex_max_tools, 128),
 			       COALESCE(codex_ws_keepalive_enabled, false),
@@ -1635,6 +1638,7 @@ func (db *DB) GetSystemSettings(ctx context.Context) (*SystemSettings, error) {
 		&s.ShowFullUsageNumbers,
 		&s.PublicKeyUsagePageEnabled,
 		&s.ReasoningEffortModels,
+		&s.DisabledImageGenerationModels,
 		&s.CodexForceWebsocket,
 		&s.CodexMaxTools,
 		&s.CodexWSKeepaliveEnabled,
@@ -1672,6 +1676,9 @@ func (db *DB) GetSystemSettings(ctx context.Context) (*SystemSettings, error) {
 	if strings.TrimSpace(s.ReasoningEffortModels) == "" {
 		s.ReasoningEffortModels = "[]"
 	}
+	if strings.TrimSpace(s.DisabledImageGenerationModels) == "" {
+		s.DisabledImageGenerationModels = "[]"
+	}
 	if strings.TrimSpace(s.CodexUserAgentConfig) == "" {
 		s.CodexUserAgentConfig = "{}"
 	}
@@ -1688,6 +1695,10 @@ func (db *DB) UpdateSystemSettings(ctx context.Context, s *SystemSettings) error
 	reasoningEffortModels := strings.TrimSpace(s.ReasoningEffortModels)
 	if reasoningEffortModels == "" {
 		reasoningEffortModels = "[]"
+	}
+	disabledImageGenerationModels := strings.TrimSpace(s.DisabledImageGenerationModels)
+	if disabledImageGenerationModels == "" {
+		disabledImageGenerationModels = "[]"
 	}
 	codexUserAgentConfig := strings.TrimSpace(s.CodexUserAgentConfig)
 	if codexUserAgentConfig == "" {
@@ -1720,9 +1731,10 @@ func (db *DB) UpdateSystemSettings(ctx context.Context, s *SystemSettings) error
 				scheduler_mode,
 				affinity_mode,
 				background_config,
-				show_full_usage_numbers,
-				public_key_usage_page_enabled,
+					show_full_usage_numbers,
+					public_key_usage_page_enabled,
 					reasoning_effort_models,
+					disabled_image_generation_models,
 					codex_force_websocket,
 					codex_max_tools,
 					codex_ws_keepalive_enabled,
@@ -1748,7 +1760,7 @@ func (db *DB) UpdateSystemSettings(ctx context.Context, s *SystemSettings) error
 					model_pricing_sync_url,
 					ignore_usage_limit_status
 					)
-						VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81, $82, $83, $84, $85, $86, $87, $88)
+						VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81, $82, $83, $84, $85, $86, $87, $88, $89)
 				ON CONFLICT (id) DO UPDATE SET
 				site_name               = EXCLUDED.site_name,
 				site_logo               = EXCLUDED.site_logo,
@@ -1812,8 +1824,9 @@ func (db *DB) UpdateSystemSettings(ctx context.Context, s *SystemSettings) error
 				affinity_mode = EXCLUDED.affinity_mode,
 				background_config = EXCLUDED.background_config,
 				show_full_usage_numbers = EXCLUDED.show_full_usage_numbers,
-				public_key_usage_page_enabled = EXCLUDED.public_key_usage_page_enabled,
+					public_key_usage_page_enabled = EXCLUDED.public_key_usage_page_enabled,
 					reasoning_effort_models = EXCLUDED.reasoning_effort_models,
+					disabled_image_generation_models = EXCLUDED.disabled_image_generation_models,
 					codex_force_websocket = EXCLUDED.codex_force_websocket,
 					codex_max_tools = EXCLUDED.codex_max_tools,
 					codex_ws_keepalive_enabled = EXCLUDED.codex_ws_keepalive_enabled,
@@ -1851,7 +1864,7 @@ func (db *DB) UpdateSystemSettings(ctx context.Context, s *SystemSettings) error
 		s.PromptFilterReviewModel, s.PromptFilterReviewTimeoutSeconds, s.PromptFilterReviewFailClosed,
 		s.ClientCompatMode, s.CodexMinCLIVersion, codexUserAgentConfig, s.UsageLogMode, s.UsageLogBatchSize,
 		s.UsageLogFlushIntervalSeconds, s.StreamFlushPolicy, s.StreamFlushIntervalMS,
-		s.FirstTokenTimeoutSeconds, firstTokenMode, billingTierPolicy, s.ImageStorageConfig, s.SchedulerMode, normalizeAffinityMode(s.AffinityMode), s.BackgroundConfig, s.ShowFullUsageNumbers, s.PublicKeyUsagePageEnabled, reasoningEffortModels,
+		s.FirstTokenTimeoutSeconds, firstTokenMode, billingTierPolicy, s.ImageStorageConfig, s.SchedulerMode, normalizeAffinityMode(s.AffinityMode), s.BackgroundConfig, s.ShowFullUsageNumbers, s.PublicKeyUsagePageEnabled, reasoningEffortModels, disabledImageGenerationModels,
 		s.CodexForceWebsocket, normalizeCodexMaxToolsDB(s.CodexMaxTools), s.CodexWSKeepaliveEnabled, normalizeCodexWSKeepaliveInterval(s.CodexWSKeepaliveIntervalSec),
 		s.CodexWSHideUpstreamErrors, s.CodexWSSilentRetryEnabled, normalizeCodexWSSilentMaxRetries(s.CodexWSSilentMaxRetries),
 		s.AutoPause5hThreshold, s.AutoPause7dThreshold, s.AutoPause5hGuardBandPercent, s.AutoPause5hGuardConcurrency,

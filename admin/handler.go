@@ -5990,6 +5990,7 @@ type settingsResponse struct {
 	ProxyPoolEnabled                   bool    `json:"proxy_pool_enabled"`
 	FastSchedulerEnabled               bool    `json:"fast_scheduler_enabled"`
 	CodexForceWebsocket                bool    `json:"codex_force_websocket"`
+	CodexMaxTools                      int     `json:"codex_max_tools"`
 	CodexWSKeepaliveEnabled            bool    `json:"codex_ws_keepalive_enabled"`
 	CodexWSKeepaliveIntervalSec        int     `json:"codex_ws_keepalive_interval_sec"`
 	CodexWSHideUpstreamErrors          bool    `json:"codex_ws_hide_upstream_errors"`
@@ -6095,6 +6096,7 @@ type updateSettingsReq struct {
 	ProxyPoolEnabled                   *bool    `json:"proxy_pool_enabled"`
 	FastSchedulerEnabled               *bool    `json:"fast_scheduler_enabled"`
 	CodexForceWebsocket                *bool    `json:"codex_force_websocket"`
+	CodexMaxTools                      *int     `json:"codex_max_tools"`
 	CodexWSKeepaliveEnabled            *bool    `json:"codex_ws_keepalive_enabled"`
 	CodexWSKeepaliveIntervalSec        *int     `json:"codex_ws_keepalive_interval_sec"`
 	CodexWSHideUpstreamErrors          *bool    `json:"codex_ws_hide_upstream_errors"`
@@ -6692,6 +6694,7 @@ func (h *Handler) GetSettings(c *gin.Context) {
 		ProxyPoolEnabled:                   h.store.GetProxyPoolEnabled(),
 		FastSchedulerEnabled:               h.store.FastSchedulerEnabled(),
 		CodexForceWebsocket:                h.store.CodexForceWebsocket(),
+		CodexMaxTools:                      runtimeCfg.CodexMaxTools,
 		CodexWSKeepaliveEnabled:            h.store.CodexWSKeepaliveEnabled(),
 		CodexWSKeepaliveIntervalSec:        h.store.CodexWSKeepaliveIntervalSec(),
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),
@@ -7067,6 +7070,11 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		h.store.SetCodexForceWebsocket(*req.CodexForceWebsocket)
 		runtimeCfg.CodexForceWebsocket = *req.CodexForceWebsocket
 		log.Printf("设置已更新: codex_force_websocket = %t", *req.CodexForceWebsocket)
+	}
+
+	if req.CodexMaxTools != nil {
+		runtimeCfg.CodexMaxTools = *req.CodexMaxTools
+		log.Printf("设置已更新: codex_max_tools = %d", runtimeCfg.CodexMaxTools)
 	}
 
 	if req.CodexWSKeepaliveEnabled != nil {
@@ -7516,6 +7524,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		ProxyPoolEnabled:                   h.store.GetProxyPoolEnabled(),
 		FastSchedulerEnabled:               h.store.FastSchedulerEnabled(),
 		CodexForceWebsocket:                h.store.CodexForceWebsocket(),
+		CodexMaxTools:                      runtimeCfg.CodexMaxTools,
 		CodexWSKeepaliveEnabled:            h.store.CodexWSKeepaliveEnabled(),
 		CodexWSKeepaliveIntervalSec:        h.store.CodexWSKeepaliveIntervalSec(),
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),
@@ -7626,6 +7635,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		ProxyPoolEnabled:                   h.store.GetProxyPoolEnabled(),
 		FastSchedulerEnabled:               h.store.FastSchedulerEnabled(),
 		CodexForceWebsocket:                h.store.CodexForceWebsocket(),
+		CodexMaxTools:                      runtimeCfg.CodexMaxTools,
 		CodexWSKeepaliveEnabled:            h.store.CodexWSKeepaliveEnabled(),
 		CodexWSKeepaliveIntervalSec:        h.store.CodexWSKeepaliveIntervalSec(),
 		CodexWSHideUpstreamErrors:          h.store.CodexWSHideUpstreamErrors(),

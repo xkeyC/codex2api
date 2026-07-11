@@ -609,6 +609,7 @@ export interface SystemSettings {
   proxy_pool_enabled: boolean
   fast_scheduler_enabled: boolean
   codex_force_websocket: boolean
+  codex_max_tools: number
   codex_ws_keepalive_enabled: boolean
   codex_ws_keepalive_interval_sec: number
   codex_ws_hide_upstream_errors: boolean

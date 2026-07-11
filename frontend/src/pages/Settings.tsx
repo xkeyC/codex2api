@@ -1136,6 +1136,7 @@ export default function Settings() {
     proxy_pool_enabled: false,
     fast_scheduler_enabled: false,
     codex_force_websocket: false,
+    codex_max_tools: 128,
     codex_ws_keepalive_enabled: false,
     codex_ws_keepalive_interval_sec: 60,
     codex_ws_hide_upstream_errors: true,
@@ -2234,6 +2235,22 @@ export default function Settings() {
               </div>
 
               <div className={cn(SETTINGS_FIELD_GRID, 'border-t border-border/80 pt-4')}>
+                <SettingField
+                  label={t('settings.codexMaxTools')}
+                  description={t('settings.codexMaxToolsDesc')}
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    value={settingsForm.codex_max_tools}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSettingsForm(f => ({ ...f, codex_max_tools: parseInt(e.target.value) || 128 }))}
+                    onBlur={() => {
+                      void autoSaveSettingsPatch({
+                        codex_max_tools: settingsForm.codex_max_tools,
+                      })
+                    }}
+                  />
+                </SettingField>
                 <SettingField
                   label={t('settings.codexWSKeepaliveInterval')}
                   description={t('settings.codexWSKeepaliveIntervalDesc')}

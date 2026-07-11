@@ -163,14 +163,20 @@ type openAIErrorResponse struct {
 
 const requestCacheSize = 256
 
-// maxTools 上游 Codex API 允许的最大工具数量
-const maxTools = 128
-
 const (
 	codexImageGenerationBridgeMarker = "<codex2api-codex-image-generation>"
 	codexImageGenerationBridgeText   = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but that does not mean image generation is unavailable. Do not ask the user to switch to CLI fallback solely because `image_gen` is absent.\n</codex2api-codex-image-generation>"
 	jsonObjectFormatInputHint        = "Return a valid JSON object."
+	proactiveMessageToolName         = "send_message_to_user"
 )
+
+func currentCodexMaxTools() int {
+	maxTools := CurrentRuntimeSettings().CodexMaxTools
+	if maxTools <= 0 {
+		return defaultCodexMaxTools
+	}
+	return maxTools
+}
 
 var responsesImageGenerationOptionFields = []string{
 	"size",
@@ -397,10 +403,9 @@ func ensureResponsesImageGenerationTool(body map[string]any) bool {
 			return false
 		}
 	}
+	maxTools := currentCodexMaxTools()
 	if len(tools) >= maxTools {
-		truncated := append([]any(nil), tools[:maxTools]...)
-		truncated[maxTools-1] = defaultTool
-		body["tools"] = truncated
+		body["tools"] = appendPriorityResponsesTool(tools, defaultTool, maxTools)
 		return true
 	}
 	body["tools"] = append(tools, defaultTool)
@@ -1248,26 +1253,86 @@ func compactionSummaryText(raw any) string {
 	return ""
 }
 
+func isResponsesImageGenerationTool(rawTool any) bool {
+	toolMap, ok := rawTool.(map[string]any)
+	if !ok {
+		return false
+	}
+	return strings.TrimSpace(firstNonEmptyAnyString(toolMap["type"])) == "image_generation"
+}
+
+func isProactiveMessageTool(rawTool any) bool {
+	toolMap, ok := rawTool.(map[string]any)
+	if !ok || strings.TrimSpace(firstNonEmptyAnyString(toolMap["type"])) != "function" {
+		return false
+	}
+	return responsesFunctionToolName(toolMap) == proactiveMessageToolName
+}
+
+func containsResponsesTool(tools []any, match func(any) bool) bool {
+	for _, rawTool := range tools {
+		if match(rawTool) {
+			return true
+		}
+	}
+	return false
+}
+
+func responsesToolReplacementSlot(tools []any) int {
+	for i := len(tools) - 1; i >= 0; i-- {
+		if !isResponsesImageGenerationTool(tools[i]) && !isProactiveMessageTool(tools[i]) {
+			return i
+		}
+	}
+	return -1
+}
+
+func appendPriorityResponsesTool(tools []any, tool any, maxTools int) []any {
+	if maxTools <= 0 {
+		maxTools = defaultCodexMaxTools
+	}
+	if len(tools) < maxTools {
+		return append(tools, tool)
+	}
+	truncated := append([]any(nil), tools[:maxTools]...)
+	if containsResponsesTool(truncated, isResponsesImageGenerationTool) {
+		return truncated
+	}
+	if replacementSlot := responsesToolReplacementSlot(truncated); replacementSlot >= 0 {
+		truncated[replacementSlot] = tool
+	}
+	return truncated
+}
+
 func truncateToolsPreservingImageGeneration(tools []any) []any {
+	maxTools := currentCodexMaxTools()
 	if len(tools) <= maxTools {
 		return tools
 	}
+	truncated := append([]any(nil), tools[:maxTools]...)
 	imageIndex := -1
+	messageIndex := -1
 	for i, rawTool := range tools {
-		toolMap, ok := rawTool.(map[string]any)
-		if !ok {
-			continue
-		}
-		if strings.TrimSpace(firstNonEmptyAnyString(toolMap["type"])) == "image_generation" {
+		if imageIndex < 0 && isResponsesImageGenerationTool(rawTool) {
 			imageIndex = i
+		}
+		if messageIndex < 0 && isProactiveMessageTool(rawTool) {
+			messageIndex = i
+		}
+		if imageIndex >= 0 && messageIndex >= 0 {
 			break
 		}
 	}
-	if imageIndex < 0 || imageIndex < maxTools {
-		return tools[:maxTools]
+	if messageIndex >= maxTools && !containsResponsesTool(truncated, isProactiveMessageTool) {
+		if replacementSlot := responsesToolReplacementSlot(truncated); replacementSlot >= 0 {
+			truncated[replacementSlot] = tools[messageIndex]
+		}
 	}
-	truncated := append([]any(nil), tools[:maxTools]...)
-	truncated[maxTools-1] = tools[imageIndex]
+	if imageIndex >= maxTools && !containsResponsesTool(truncated, isResponsesImageGenerationTool) {
+		if replacementSlot := responsesToolReplacementSlot(truncated); replacementSlot >= 0 {
+			truncated[replacementSlot] = tools[imageIndex]
+		}
+	}
 	return truncated
 }
 
@@ -1717,6 +1782,7 @@ func prepareResponsesBodyWithOptions(rawBody []byte, opts responsesBodyPrepareOp
 
 	// 5. 工具描述补充 + schema 清理 + 上游数量限制
 	if tools, ok := body["tools"].([]any); ok {
+		maxTools := currentCodexMaxTools()
 		if len(tools) > maxTools {
 			tools = truncateToolsPreservingImageGeneration(tools)
 			body["tools"] = tools
@@ -2107,9 +2173,10 @@ func firstNonSpace(raw json.RawMessage) byte {
 // convertToolsToCodexFormat 将 OpenAI 工具格式转为 Codex 格式（纯内存操作）
 // OpenAI: {type:"function", function:{name, description, parameters}}
 // Codex:  {type:"function", name, description, parameters}
-// 上游限制最多 128 个工具，超出部分静默截断
+// 上游限制工具数量，超出部分静默截断
 func convertToolsToCodexFormat(rawTools []json.RawMessage) []any {
 	cap := len(rawTools)
+	maxTools := currentCodexMaxTools()
 	if cap > maxTools {
 		cap = maxTools
 		rawTools = rawTools[:maxTools]

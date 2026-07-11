@@ -1418,8 +1418,26 @@ func TestPrepareResponsesBody_PromptCompatAndTopLevelImageOptions(t *testing.T) 
 	}
 }
 
+func toolListContainsName(tools []gjson.Result, name string) bool {
+	for _, tool := range tools {
+		if tool.Get("name").String() == name || tool.Get("function.name").String() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func toolListContainsType(tools []gjson.Result, toolType string) bool {
+	for _, tool := range tools {
+		if tool.Get("type").String() == toolType {
+			return true
+		}
+	}
+	return false
+}
+
 func TestPrepareResponsesBody_InjectsImageToolWithinToolLimit(t *testing.T) {
-	tools := make([]any, maxTools)
+	tools := make([]any, defaultCodexMaxTools)
 	for i := range tools {
 		tools[i] = map[string]any{
 			"type":        "function",
@@ -1443,8 +1461,8 @@ func TestPrepareResponsesBody_InjectsImageToolWithinToolLimit(t *testing.T) {
 	got, _ := PrepareResponsesBody(raw)
 
 	outTools := gjson.GetBytes(got, "tools").Array()
-	if len(outTools) != maxTools {
-		t.Fatalf("tools count = %d, want %d; body=%s", len(outTools), maxTools, got)
+	if len(outTools) != defaultCodexMaxTools {
+		t.Fatalf("tools count = %d, want %d; body=%s", len(outTools), defaultCodexMaxTools, got)
 	}
 	last := outTools[len(outTools)-1]
 	if last.Get("type").String() != "image_generation" {
@@ -1452,6 +1470,134 @@ func TestPrepareResponsesBody_InjectsImageToolWithinToolLimit(t *testing.T) {
 	}
 	if last.Get("model").String() != defaultImagesToolModel {
 		t.Fatalf("image tool model = %q, want %q; body=%s", last.Get("model").String(), defaultImagesToolModel, got)
+	}
+}
+
+func TestPrepareResponsesBody_PreservesMessageToolWhenInjectingImageToolWithinLimit(t *testing.T) {
+	tools := make([]any, defaultCodexMaxTools)
+	for i := range tools {
+		tools[i] = map[string]any{
+			"type":        "function",
+			"name":        fmt.Sprintf("tool_%d", i),
+			"description": "test tool",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		}
+	}
+	tools[defaultCodexMaxTools-1] = map[string]any{
+		"type":        "function",
+		"name":        proactiveMessageToolName,
+		"description": "Send message to user",
+		"parameters": map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
+	}
+	raw, err := json.Marshal(map[string]any{
+		"model": "gpt-5.4-mini",
+		"input": "draw a cat and send it",
+		"tools": tools,
+	})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	got, _ := PrepareResponsesBody(raw)
+
+	outTools := gjson.GetBytes(got, "tools").Array()
+	if len(outTools) != defaultCodexMaxTools {
+		t.Fatalf("tools count = %d, want %d; body=%s", len(outTools), defaultCodexMaxTools, got)
+	}
+	if !toolListContainsName(outTools, proactiveMessageToolName) {
+		t.Fatalf("%s should be preserved; body=%s", proactiveMessageToolName, got)
+	}
+	if !toolListContainsType(outTools, "image_generation") {
+		t.Fatalf("image_generation tool should be injected; body=%s", got)
+	}
+}
+
+func TestPrepareResponsesBody_UsesConfiguredCodexMaxTools(t *testing.T) {
+	previous := CurrentRuntimeSettings()
+	t.Cleanup(func() { ApplyRuntimeSettings(previous) })
+	ApplyRuntimeSettings(RuntimeSettings{CodexMaxTools: 4})
+
+	tools := []any{
+		map[string]any{"type": "function", "name": "tool_0", "parameters": map[string]any{"type": "object", "properties": map[string]any{}}},
+		map[string]any{"type": "function", "name": "tool_1", "parameters": map[string]any{"type": "object", "properties": map[string]any{}}},
+		map[string]any{"type": "function", "name": "tool_2", "parameters": map[string]any{"type": "object", "properties": map[string]any{}}},
+		map[string]any{"type": "function", "name": proactiveMessageToolName, "parameters": map[string]any{"type": "object", "properties": map[string]any{}}},
+	}
+	raw, err := json.Marshal(map[string]any{
+		"model": "gpt-5.4-mini",
+		"input": "draw a cat and send it",
+		"tools": tools,
+	})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	got, _ := PrepareResponsesBody(raw)
+
+	outTools := gjson.GetBytes(got, "tools").Array()
+	if len(outTools) != 4 {
+		t.Fatalf("tools count = %d, want 4; body=%s", len(outTools), got)
+	}
+	if !toolListContainsName(outTools, proactiveMessageToolName) {
+		t.Fatalf("%s should be preserved; body=%s", proactiveMessageToolName, got)
+	}
+	if !toolListContainsType(outTools, "image_generation") {
+		t.Fatalf("image_generation tool should be injected; body=%s", got)
+	}
+}
+
+func TestPrepareResponsesBody_PreservesMessageToolWhenTruncatingToolList(t *testing.T) {
+	tools := make([]any, defaultCodexMaxTools+2)
+	for i := range tools {
+		tools[i] = map[string]any{
+			"type":        "function",
+			"name":        fmt.Sprintf("tool_%d", i),
+			"description": "test tool",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		}
+	}
+	tools[defaultCodexMaxTools] = map[string]any{
+		"type":        "function",
+		"name":        proactiveMessageToolName,
+		"description": "Send message to user",
+		"parameters": map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
+	}
+	tools[defaultCodexMaxTools+1] = map[string]any{
+		"type":  "image_generation",
+		"model": defaultImagesToolModel,
+	}
+	raw, err := json.Marshal(map[string]any{
+		"model": "gpt-5.4-mini",
+		"input": "draw a cat and send it",
+		"tools": tools,
+	})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	got, _ := PrepareResponsesBody(raw)
+
+	outTools := gjson.GetBytes(got, "tools").Array()
+	if len(outTools) != defaultCodexMaxTools {
+		t.Fatalf("tools count = %d, want %d; body=%s", len(outTools), defaultCodexMaxTools, got)
+	}
+	if !toolListContainsName(outTools, proactiveMessageToolName) {
+		t.Fatalf("%s should be preserved; body=%s", proactiveMessageToolName, got)
+	}
+	if !toolListContainsType(outTools, "image_generation") {
+		t.Fatalf("image_generation tool should be preserved; body=%s", got)
 	}
 }
 

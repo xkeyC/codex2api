@@ -45,6 +45,7 @@ const (
 	defaultCodexWSSilentRetry    = true
 	defaultCodexWSSilentRetries  = 2
 	maxCodexWSSilentRetries      = 10
+	defaultCodexMaxTools         = 128
 
 	defaultCodexContinueMaxRounds = 8
 	minCodexContinueMaxRounds     = 1
@@ -64,6 +65,7 @@ type RuntimeSettings struct {
 	CodexWSHideErrors     bool // 隐藏 Codex WS 上游原始错误（默认 true）
 	CodexWSSilentRetry    bool // 首包前 Codex WS 上游错误静默换号重试（默认 true）
 	CodexWSSilentRetries  int  // Codex WS 静默换号最大重试次数（默认 2）
+	CodexMaxTools         int  // Codex 上游允许的最大工具数量（默认 128）
 	// CodexContinueThinking 检测到上游按 518n-2 指纹截断思考时自动续想并折叠成单响应（默认 false）。
 	CodexContinueThinking  bool
 	CodexContinueMaxRounds int // 单次请求最大续想轮数，含首轮（默认 8，范围 1-32）
@@ -92,19 +94,20 @@ func init() {
 
 func DefaultRuntimeSettings() RuntimeSettings {
 	return RuntimeSettings{
-		ClientCompatMode:       defaultClientCompatMode,
-		CodexMinCLIVersion:     defaultCodexMinCLIVersion,
-		CodexUserAgentConfig:   DefaultCodexUserAgentConfigJSON(),
-		StreamFlushPolicy:      defaultStreamFlushPolicy,
-		StreamFlushIntervalMS:  defaultStreamFlushIntervalMS,
-		FirstTokenMode:         defaultFirstTokenMode,
-		FirstTokenTimeoutSec:   defaultFirstTokenTimeoutSec,
-		BillingTierPolicy:      defaultBillingTierPolicy,
-		CodexWSHideErrors:      defaultCodexWSHideErrors,
-		CodexWSSilentRetry:     defaultCodexWSSilentRetry,
-		CodexWSSilentRetries:   defaultCodexWSSilentRetries,
-		CodexContinueMaxRounds: defaultCodexContinueMaxRounds,
-		RequestIsolationMode:   defaultRequestIsolationMode(),
+		ClientCompatMode:                 defaultClientCompatMode,
+		CodexMinCLIVersion:               defaultCodexMinCLIVersion,
+		CodexUserAgentConfig:             DefaultCodexUserAgentConfigJSON(),
+		StreamFlushPolicy:                defaultStreamFlushPolicy,
+		StreamFlushIntervalMS:            defaultStreamFlushIntervalMS,
+		FirstTokenMode:                   defaultFirstTokenMode,
+		FirstTokenTimeoutSec:             defaultFirstTokenTimeoutSec,
+		BillingTierPolicy:                defaultBillingTierPolicy,
+		CodexWSHideErrors:                defaultCodexWSHideErrors,
+		CodexWSSilentRetry:               defaultCodexWSSilentRetry,
+		CodexWSSilentRetries:             defaultCodexWSSilentRetries,
+		CodexMaxTools:                    defaultCodexMaxTools,
+		CodexContinueMaxRounds:           defaultCodexContinueMaxRounds,
+		RequestIsolationMode:             defaultRequestIsolationMode(),
 		CodexCLIVersionSyncEnabled:       true,
 		CodexCLIVersionSyncIntervalHours: 12,
 	}
@@ -208,6 +211,9 @@ func NormalizeRuntimeSettings(settings RuntimeSettings) RuntimeSettings {
 	if settings.CodexWSSilentRetries > maxCodexWSSilentRetries {
 		settings.CodexWSSilentRetries = maxCodexWSSilentRetries
 	}
+	if settings.CodexMaxTools <= 0 {
+		settings.CodexMaxTools = defaults.CodexMaxTools
+	}
 	if settings.CodexContinueMaxRounds < minCodexContinueMaxRounds {
 		settings.CodexContinueMaxRounds = defaults.CodexContinueMaxRounds
 	}
@@ -232,6 +238,7 @@ func ApplyRuntimeSettingsFromSystem(settings *database.SystemSettings) RuntimeSe
 		next.CodexWSHideErrors = settings.CodexWSHideUpstreamErrors
 		next.CodexWSSilentRetry = settings.CodexWSSilentRetryEnabled
 		next.CodexWSSilentRetries = settings.CodexWSSilentMaxRetries
+		next.CodexMaxTools = settings.CodexMaxTools
 		next.CodexContinueThinking = settings.CodexContinueThinkingEnabled
 		next.CodexContinueMaxRounds = settings.CodexContinueMaxRounds
 		next.CodexSyncedCLIVersion = settings.CodexSyncedCLIVersion
